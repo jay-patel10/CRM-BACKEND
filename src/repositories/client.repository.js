@@ -8,7 +8,12 @@ class ClientRepository extends CrudRepository {
     super(Client);
   }
 
-  // Add custom queries if needed later (e.g. filter, pagination)
+  async getFilteredClients(filter = {}, sort = []) {
+    return await Client.findAll({
+      where: filter,
+      order: sort
+    });
+  }
 }
 
 export default new ClientRepository();

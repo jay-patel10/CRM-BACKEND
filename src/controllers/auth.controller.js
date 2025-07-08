@@ -6,7 +6,6 @@ import {
   verifyOtpService,
   forgotPasswordService,
   verifyForgotPasswordTokenService,
-  resetPasswordService,
   logoutUserService
 } from '../services/index.js';
 import { SuccessResponse, ErrorResponse } from '../utils/index.js';
@@ -78,17 +77,6 @@ export const forgotPassword = async (req, res) => {
 export const verifyForgotPasswordToken = async (req, res) => {
   try {
     const data = await verifyForgotPasswordTokenService(req.body);
-    SuccessResponse.data = data;
-    return res.status(StatusCodes.OK).json(SuccessResponse);
-  } catch (err) {
-    ErrorResponse.error = err;
-    return res.status(err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json(ErrorResponse);
-  }
-};
-
-export const resetPassword = async (req, res) => {
-  try {
-    const data = await resetPasswordService(req.body.token, req.body.newPassword);
     SuccessResponse.data = data;
     return res.status(StatusCodes.OK).json(SuccessResponse);
   } catch (err) {

@@ -15,10 +15,6 @@ class UserRepository extends CrudRepository {
   async findByToken(token) {
     return await User.findOne({ where: { verificationToken: token } });
   }
-
-  async findByResetToken(token) {
-    return await User.findOne({ where: { resetToken: token } });
-  }
 }
 
 export default new UserRepository();

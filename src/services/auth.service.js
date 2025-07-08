@@ -3,13 +3,9 @@ import jwt from 'jsonwebtoken';
 import moment from 'moment';
 import nodemailer from 'nodemailer';
 import { randomBytes } from 'crypto';
-
 import { AppError } from '../utils/index.js';
 import { StatusCodes } from 'http-status-codes';
 import { UserRepository } from '../repositories/index.js';
-import db from '../models/index.js';
-
-const { UserPermission, Permission } = db;
 
 const transporter = nodemailer.createTransport({
   host: 'sandbox.smtp.mailtrap.io',
@@ -136,16 +132,18 @@ export const verifyOtpService = async (email, otp) => {
   };
 };
 
+
 export const forgotPasswordService = async (email) => {
   const user = await UserRepository.findByEmail(email);
   if (!user) throw new AppError('User not found', StatusCodes.NOT_FOUND);
 
+  // ✅ Generate token and store in verificationToken
   const resetToken = randomBytes(32).toString('hex');
-  const resetTokenExpiry = moment().add(30, 'minutes').toDate();
+  const verificationDeadline = moment().add(30, 'minutes').toDate();
 
   await UserRepository.update(user.id, {
-    resetToken,
-    resetTokenExpiry
+    verificationToken: resetToken,
+    verificationDeadline
   });
 
   const resetLink = `https://yourapp.com/reset-password?token=${resetToken}`;
@@ -154,7 +152,7 @@ export const forgotPasswordService = async (email) => {
     from: '"NoReply" <no-reply@yourapp.com>',
     to: email,
     subject: 'Password Reset Request',
-    text: `Click to reset your password (valid 30 mins):\n${resetLink}`
+    text: `Click to reset your password (valid for 30 minutes):\n\n${resetLink}`
   });
 
   return { message: 'Password reset link sent to your email.' };
@@ -169,36 +167,20 @@ export const verifyForgotPasswordTokenService = async ({ token, newPassword, con
     throw new AppError('Passwords do not match', StatusCodes.BAD_REQUEST);
   }
 
-  const user = await UserRepository.findByResetToken(token);
+  const user = await UserRepository.findByToken(token); // assumes it checks verificationToken
 
-  if (!user || new Date(user.resetTokenExpiry) < new Date()) {
+  if (!user || new Date(user.verificationDeadline) < new Date()) {
     throw new AppError('Invalid or expired token', StatusCodes.BAD_REQUEST);
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   await UserRepository.update(user.id, {
     password: hashedPassword,
-    resetToken: null,
-    resetTokenExpiry: null
+    verificationToken: null,
+    verificationDeadline: null
   });
 
   return { message: 'Password reset successful' };
-};
-
-export const resetPasswordService = async (token, newPassword) => {
-  const user = await UserRepository.findByResetToken(token);
-  if (!user || new Date(user.resetTokenExpiry) < new Date()) {
-    throw new AppError('Invalid or expired reset token', StatusCodes.BAD_REQUEST);
-  }
-
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  await UserRepository.update(user.id, {
-    password: hashedPassword,
-    resetToken: null,
-    resetTokenExpiry: null
-  });
-
-  return { message: 'Password reset successful. You can now log in.' };
 };
 
 export const logoutUserService = async (authHeader) => {

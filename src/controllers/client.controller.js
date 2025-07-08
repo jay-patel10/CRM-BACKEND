@@ -21,7 +21,7 @@ export const createClient = async (req, res) => {
 
 export const getAllClients = async (req, res) => {
   try {
-    const clients = await getAllClientsService();
+    const clients = await getAllClientsService(req.query); // ✅ Pass query params
     SuccessResponse.data = clients;
     return res.status(StatusCodes.OK).json(SuccessResponse);
   } catch (error) {
