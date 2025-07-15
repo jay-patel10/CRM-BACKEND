@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { decryptPassword } from '../utils/common/decrypt.js';
 import jwt from 'jsonwebtoken';
 import moment from 'moment';
 import nodemailer from 'nodemailer';
@@ -21,7 +22,15 @@ export const registerUserService = async ({ name, email, password, confirmPasswo
     throw new AppError('All fields are required', StatusCodes.BAD_REQUEST);
   }
 
-  if (password !== confirmPassword) {
+  // 🔓 Decrypt both passwords
+  const decryptedPassword = decryptPassword(password);
+  const decryptedConfirmPassword = decryptPassword(confirmPassword);
+
+  if (!decryptedPassword || !decryptedConfirmPassword) {
+    throw new AppError('Password decryption failed', StatusCodes.BAD_REQUEST);
+  }
+
+  if (decryptedPassword !== decryptedConfirmPassword) {
     throw new AppError('Passwords do not match', StatusCodes.BAD_REQUEST);
   }
 
@@ -30,7 +39,8 @@ export const registerUserService = async ({ name, email, password, confirmPasswo
     throw new AppError('Email already registered', StatusCodes.BAD_REQUEST);
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // 🔐 Hash the decrypted password
+  const hashedPassword = await bcrypt.hash(decryptedPassword, 10);
   const verificationToken = randomBytes(32).toString('hex');
   const verificationDeadline = moment().add(30, 'minutes').toDate();
 
@@ -48,10 +58,12 @@ export const registerUserService = async ({ name, email, password, confirmPasswo
     from: '"NoReply" <no-reply@yourapp.com>',
     to: email,
     subject: 'Verify Your Email Address',
-    text: `Hello ${name},\n\nClick this link to verify your email (expires in 30 mins):\n${verificationLink}`
+    text: `Hello ${name},\n\nClick this link to verify your email (expires in 30 mins):\n\n${verificationLink}`
   });
 
-  return { message: 'Registration successful. Check your email to verify your account.' };
+  return {
+    message: 'Registration successful. Check your email to verify your account.'
+  };
 };
 
 export const verifyEmailService = async (token) => {
@@ -71,16 +83,32 @@ export const verifyEmailService = async (token) => {
   return { message: 'Email verified successfully' };
 };
 
-export const loginUserService = async (email, password) => {
+
+export const loginUserService = async (email, encryptedPassword) => {
   const user = await UserRepository.findByEmail(email);
-  if (!user) throw new AppError('User not found', StatusCodes.NOT_FOUND);
-  if (!user.isVerified) throw new AppError('Please verify your email first', StatusCodes.UNAUTHORIZED);
+  if (!user) {
+    throw new AppError('User not found', StatusCodes.NOT_FOUND);
+  }
 
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) throw new AppError('Invalid credentials', StatusCodes.UNAUTHORIZED);
+  if (!user.isVerified) {
+    throw new AppError('Please verify your email first', StatusCodes.UNAUTHORIZED);
+  }
 
+  // 🔓 Decrypt incoming password
+  const decryptedPassword = decryptPassword(encryptedPassword);
+  if (!decryptedPassword) {
+    throw new AppError('Password decryption failed', StatusCodes.BAD_REQUEST);
+  }
+console.log('[LOGIN] Decrypted password:', decryptedPassword); // 🔐 TEMP ONLY
+  // 🔐 Compare decrypted password with hashed password in DB
+  const isPasswordValid = await bcrypt.compare(decryptedPassword, user.password);
+  if (!isPasswordValid) {
+    throw new AppError('Invalid credentials', StatusCodes.UNAUTHORIZED);
+  }
+
+  // 🔢 Generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
 
   await UserRepository.update(user.id, {
     otp,
@@ -94,9 +122,10 @@ export const loginUserService = async (email, password) => {
     text: `Your OTP is: ${otp}. It will expire in 10 minutes.`
   });
 
-  return { message: 'OTP sent to your email. Please verify.' };
+  return {
+    message: 'OTP sent to your email. Please verify.'
+  };
 };
-
 
 export const verifyOtpService = async (email, otp) => {
   const user = await UserRepository.findByEmail(email);

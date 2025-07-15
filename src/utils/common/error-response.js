@@ -1,8 +1,8 @@
-const error = {
+const ErrorResponse = {
   success: false,
-  message: 'Something went wrong',
-  data: {},
-  error: {}
+  message: '',
+  error: null,   // For generic error messages like DB errors
+  errors: {}     // For field-specific validation errors (email, name, etc.)
 };
 
-export default error;
+export default ErrorResponse;

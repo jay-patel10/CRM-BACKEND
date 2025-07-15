@@ -8,13 +8,19 @@ import {
 } from '../services/client.service.js';
 import { SuccessResponse, ErrorResponse } from '../utils/index.js';
 
+
 export const createClient = async (req, res) => {
   try {
-    const client = await createClientService(req.body);
+    const client = await createClientService(req.body, req.file); // 👈 include file
+    SuccessResponse.message = 'Client created successfully';
     SuccessResponse.data = client;
     return res.status(StatusCodes.CREATED).json(SuccessResponse);
   } catch (error) {
-    ErrorResponse.error = error;
+    ErrorResponse.message = error.message || 'Failed to create client';
+    ErrorResponse.error = {
+      statusCode: error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR,
+      explanation: error.explanation || error.message || 'Internal error'
+    };
     return res.status(error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json(ErrorResponse);
   }
 };

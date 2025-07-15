@@ -8,8 +8,6 @@ import {
   CHECKLIST_STATUSES
 } from '../utils/index.js';
 
-
-
 export const createClientService = async (data, file) => {
   const { sfId, name, departmentType, email } = data;
 
@@ -22,21 +20,22 @@ export const createClientService = async (data, file) => {
   }
 
   // 2. Validate department type against allowed values
-  if (!DEPARTMENT_TYPES.includes(departmentType)) {
+  const trimmedDepartment = departmentType.trim();
+  if (!DEPARTMENT_TYPES.includes(trimmedDepartment)) {
     throw new AppError(
       `Invalid department type. Allowed values: ${DEPARTMENT_TYPES.join(', ')}`,
       StatusCodes.BAD_REQUEST
     );
   }
 
-  // 3. Handle logo upload
+  // 3. Process uploaded logo
   const logo = file ? file.path : null;
 
-  // 4. Create client
+  // 4. Create client in DB
   const client = await ClientRepository.create({
     sfId,
     name,
-    departmentType,
+    departmentType: trimmedDepartment,
     email,
     logo,
     ...data
