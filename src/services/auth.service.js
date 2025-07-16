@@ -123,7 +123,8 @@ console.log('[LOGIN] Decrypted password:', decryptedPassword); // 🔐 TEMP ONLY
   });
 
   return {
-    message: 'OTP sent to your email. Please verify.'
+    message: 'OTP sent to your email. Please verify.',
+    role: user.role
   };
 };
 
@@ -154,10 +155,11 @@ export const verifyOtpService = async (email, otp) => {
     otp: null,
     otpExpiresAt: null
   });
-
+  
   return {
     message: 'OTP validated successfully',
-    token
+    token,
+    role: user.role,
   };
 };
 
